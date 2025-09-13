@@ -20,6 +20,7 @@ using StardewValley.BellsAndWhistles;
 using StardewValley.Characters;
 using StardewValley.Objects;
 using StardewValley.Projectiles;
+using StardewValley.TerrainFeatures;
 
 namespace PetInteraction
 {
@@ -189,9 +190,9 @@ namespace PetInteraction
         /// <summary>
         /// Returns distance between pet and player in tiles.
         /// </summary>
-        public static int PlayerPetDistance() => (int)Utility.distance(GetPet().getTileX(), Game1.player.getTileX(), GetPet().getTileY(), Game1.player.getTileY());
+        public static int PlayerPetDistance() => (int)Utility.distance(GetPet().Tile.X, Game1.player.Tile.X, GetPet().Tile.Y, Game1.player.Tile.Y);
 
-        public static int PetDistance(Vector2 tile) => (int)Utility.distance(GetPet().getTileX(), tile.X, GetPet().getTileY(), tile.Y);
+        public static int PetDistance(Vector2 tile) => (int)Utility.distance(GetPet().Tile.X, tile.X, GetPet().Tile.Y, tile.Y);
 
         private static int Distance(Vector2 vec1, Vector2 vec2) => (int)Utility.distance(vec1.X, vec2.X, vec1.Y, vec2.Y);
 
@@ -203,7 +204,7 @@ namespace PetInteraction
         public static bool CanThrow(Item item)
         {
             return !throwing && petState != PetState.Vanilla && petState != PetState.Retrieve && item != null
-                    && (item.ParentSheetIndex == Object.wood || item.ParentSheetIndex == driftwood_index);
+                    && (item.ParentSheetIndex == StardewValley.Object.wood || item.ParentSheetIndex == driftwood_index);
                     
         }
 
@@ -212,7 +213,7 @@ namespace PetInteraction
             if (throwing)
                 return;
 
-            Vector2 velocity = Utility.getVelocityTowardPoint(Game1.player.getTileLocation(), cursorTile, throw_speed);
+            Vector2 velocity = Utility.getVelocityTowardPoint(Game1.player.Tile, cursorTile, throw_speed);
 
             StickProjectile proj = new StickProjectile(item.getOne(), velocity);
             Game1.currentLocation.projectiles.Add(proj);
@@ -228,13 +229,19 @@ namespace PetInteraction
             public static Item item;
             public static Vector2 destination; //pixels
 
-            public StickProjectile(Item item, Vector2 velocity) : base(0, item.ParentSheetIndex, 0, 0, 1, velocity.X, velocity.Y, (Game1.player.getTileLocation() - new Vector2(0, 0)) * Game1.tileSize, "shwip", "throw", false, false, Game1.currentLocation, Game1.player, true, HandleonCollisionBehavior)
+            public StickProjectile(Item item, Vector2 velocity) : base(0, item.ParentSheetIndex, 0, 0, 1, velocity.X, velocity.Y, (Game1.player.Tile - new Vector2(0, 0)) * Game1.tileSize, "shwip", null, "throw", false, false, Game1.currentLocation, Game1.player, HandleonCollisionBehavior, item.itemId.Value)
             {
                 StickProjectile.item = item;
             }
-            public override bool isColliding(GameLocation location)
+            public override bool isColliding(GameLocation location, out Character target, out TerrainFeature terrainFeature)
             {
+                target = null;
+                terrainFeature = null;
                 Rectangle rect = new Rectangle((int)position.Value.X + 1, (int)position.Value.Y + 1, Game1.tileSize - 2, Game1.tileSize - 2);
+                if (Game1.player.GetBoundingBox().Intersects(rect))
+                {
+                    target = Game1.player;
+                }
                 return travelDistance > ModEntry.config.stick_range * Game1.tileSize || !Game1.player.GetBoundingBox().Intersects(rect) && location.isCollidingPosition(rect, Game1.viewport, false, 0, false, null, false, false, true);
             }
 
@@ -287,7 +294,7 @@ namespace PetInteraction
                 Stick = d.item;
                 Game1.currentLocation.debris.Remove(d);
 
-                CurrentPath = PathFinder.CalculatePath(pet, new Vector2(Game1.player.getTileX(), Game1.player.getTileY()));
+                CurrentPath = PathFinder.CalculatePath(pet, new Vector2(Game1.player.Tile.X, Game1.player.Tile.Y));
 
                 if (CurrentPath.Count > 0)
                 {
@@ -321,8 +328,8 @@ namespace PetInteraction
                 hasFetchedToday = true;
             }
 
-            if (GetPet() is Dog dog)
-                dog.pantSound(null);
+            if (GetPet().petType.Value == "Dog")
+                Game1.playSound("dog_bark");
 
             Stick = null;
 
@@ -370,8 +377,8 @@ namespace PetInteraction
             GetPet();
             if (pet == null)
                 return;
-            if (pet is Dog dog && (petState == PetState.Chasing || petState == PetState.Fetching))
-                SetPetBehavior(Dog.behavior_Sprint);
+            if (pet.petType.Value == "Dog" && (petState == PetState.Chasing || petState == PetState.Fetching))
+                SetPetBehavior(Pet.behavior_Sprint);
             else
                 SetPetBehavior(Pet.behavior_Walk);
 
@@ -425,7 +432,7 @@ namespace PetInteraction
             SetPetBehavior(Pet.behavior_SitDown);
         }
 
-        private static void SetPetBehavior(int behavior)
+        private static void SetPetBehavior(string behavior)
         {
             ModEntry.PetBehaviour = behavior;
         }
@@ -490,7 +497,7 @@ namespace PetInteraction
                     {
                         CurrentPath = path;
                         SetState(PetState.Chasing);
-                        if (pet is Dog)
+                        if (pet.petType.Value == "Dog")
                             Game1.playSound("dog_bark");
                     }
                     else
@@ -514,7 +521,7 @@ namespace PetInteraction
             {
                 Confused();
             }
-            ModEntry.Log("Cannot reach player at "+ new Vector2(Game1.player.getTileX(), Game1.player.getTileY()));
+            ModEntry.Log("Cannot reach player at "+ new Vector2(Game1.player.Tile.X, Game1.player.Tile.Y));
         }
 
         public static void CannotFetch(Vector2 stickPos)
@@ -534,7 +541,7 @@ namespace PetInteraction
             //ModEntry.GetHelper().Reflection.GetField<bool>(pet, "wasPetToday").SetValue(true);
             SetWasPetToday(GetPet(), true);
             pet.friendshipTowardFarmer.Value = System.Math.Min(1000, pet.friendshipTowardFarmer.Value + ModEntry.config.pet_petting_friendship_increase);
-            if (ModEntry.config.unconditional_love || ModEntry.config.love_everytime_at_max_friendship && pet.friendshipTowardFarmer >= 1000 && Game1.player != null)
+            if (ModEntry.config.unconditional_love || ModEntry.config.love_everytime_at_max_friendship && pet.friendshipTowardFarmer.Value >= 1000 && Game1.player != null)
             {
                 Game1.showGlobalMessage(Game1.content.LoadString("Strings\\Characters:PetLovesYou", pet.displayName));
                 if (!Game1.player.mailReceived.Contains("petLoveMessage"))
