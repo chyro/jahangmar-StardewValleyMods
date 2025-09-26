@@ -1,11 +1,11 @@
 ﻿{
   "Name": "Pet Interaction",
   "Author": "jahangmar",
-  "Version": "1.1.4",
+  "Version": "1.1.6",
   "Description": "Lets your pet follow you, do silly stuff, and play fetch",
-  "UniqueID": "jahangmar.PetInteraction",
+  "UniqueID": "chyrop.PetInteraction",
   "MinimumApiVersion": "3.0.0",
   "EntryDll": "PetInteraction.dll",
   "Dependencies": [],
-  "UpdateKeys": [ "Nexus:4232" ]
+  "UpdateKeys": [ "Nexus:37571" ]
 }
