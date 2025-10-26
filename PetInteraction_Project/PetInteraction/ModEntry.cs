@@ -23,6 +23,7 @@ using StardewValley.Characters;
 using StardewValley.Objects;
 using StardewValley.Projectiles;
 using StardewValley.Locations;
+using GenericModConfigMenu;
 
 using static PetInteraction.PetBehavior;
 using StardewValley.Tools;
@@ -197,6 +198,38 @@ namespace PetInteraction
             }
         }
 
+        void registerMenu()
+        {
+            var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (configMenu != null)
+            {
+                configMenu.Register(
+                    mod: this.ModManifest,
+                    reset: () => ModEntry.config = new Config(),
+                    save: () => this.Helper.WriteConfig(ModEntry.config)
+                );
+                configMenu.AddSubHeader(
+                    mod: this.ModManifest,
+                    text: () => Helper.Translation.Get("setting.header")
+                );
+                // string[] knownLocations = new string[] {"Farm", "FarmHouse", "FarmCave", "Town", "JoshHouse", "HaleyHouse", "SamHouse", "Blacksmith", "ManorHouse", "SeedShop", "Saloon", "Trailer", "Hospital", "HarveyRoom", "Beach", "BeachNightMarket", "ElliottHouse", "Mountain", "ScienceHouse", "SebastianRoom", "Tent", "Forest", "WizardHouse", "AnimalShop", "LeahHouse", "BusStop", "Mine", "Sewer", "BugLand", "Desert", "Club", "SandyHouse", "ArchaeologyHouse", "WizardHouseBasement", "AdventureGuild", "Woods", "Railroad", "WitchSwamp", "WitchHut", "WitchWarpCave", "Summit", "FishShop", "BathHouse_Entry", "BathHouse_MensLocker", "BathHouse_WomensLocker", "BathHouse_Pool", "CommunityCenter", "JojaMart", "Greenhouse", "SkullCave", "Backwoods", "Tunnel", "Trailer_Big", "Cellar", "MermaidHouse", "Submarine", "AbandonedJojaMart", "MovieTheater", "Sunroom", "BoatTunnel", "IslandSouth", "IslandSouthEast", "IslandSouthEastCave", "IslandEast", "IslandWest", "IslandNorth", "IslandHut", "IslandWestCave1", "IslandNorthCave1", "IslandFieldOffice", "IslandFarmHouse", "CaptainRoom", "IslandShrine", "IslandFarmCave", "Caldera", "LeoTreeHouse", "QiNutRoom", "MasteryCave", "DesertFestival", "LewisBasement"};
+                string[] knownLocations = new string[] {"Farm", "Town", "Beach", "BeachNightMarket", "Mountain", "Forest", "BusStop", "Desert", "Woods", "Railroad", "Summit", "Backwoods", "IslandSouth", "IslandSouthEast", "IslandEast", "IslandWest", "IslandNorth", "IslandShrine", "DesertFestival"}; // where is good for this?
+                foreach (GameLocation location in Game1.locations)
+                {
+                    if (!location.IsOutdoors) continue;
+                    if (knownLocations.Any(baseName => location.Name.StartsWith(baseName))) continue;
+                    // This mod handles the base game locations. The setting is for non-base locations, e.g. added by mods.
+
+                    configMenu.AddBoolOption(
+                        mod: this.ModManifest,
+                        name: () => location.DisplayName,
+                        getValue: () => ModEntry.config.getLocationSafe(location.Name),
+                        setValue: (bool value) => ModEntry.config.setLocationSafe(location.Name, value)
+                    );
+                }
+            }
+        }
+
         void GameLoop_Saving(object sender, StardewModdingAPI.Events.SavingEventArgs e)
         {
             SafeState();
@@ -207,6 +240,7 @@ namespace PetInteraction
             pet = null;
             SafeState();
             PathFinder.ResetCachedTiles();
+            this.registerMenu(); // not in GameLaunched because it needs the location list to be loaded
         }
 
         void GameLoop_DayStarted(object sender, StardewModdingAPI.Events.DayStartedEventArgs e)
@@ -679,6 +713,37 @@ namespace PetInteraction
             {
                 if (config.show_message_on_warp && !e.NewLocation.isFarmBuildingInterior() && !(e.NewLocation is FarmCave))
                     Game1.showGlobalMessage(Helper.Translation.Get("warp.waitingoutside", new { petname = GetPet().displayName }));
+            }
+            else if (config.getLocationSafe(Game1.currentLocation.Name))
+            {
+                // Unknown location, but the user configured it to count as safe. Maybe a mod's extra location?
+                List<Vector2> tryTiles = new List<Vector2>()
+                {
+                    Utility.recursiveFindOpenTileForCharacter(pet, e.NewLocation, PlayerTile, 10)
+                };
+                if (PlayerTile.X < 2)
+                {
+                    tryTiles.Insert(0, PlayerTile + new Vector2(1, 0));
+                }
+                if (PlayerTile.X > e.NewLocation.map.GetLayer("Back").LayerWidth - 2)
+                {
+                    tryTiles.Insert(0, PlayerTile + new Vector2(-1, 0));
+                }
+                if (PlayerTile.Y < 2)
+                {
+                    tryTiles.Insert(0, PlayerTile + new Vector2(0, 1));
+                }
+                if (PlayerTile.Y > e.NewLocation.map.GetLayer("Back").LayerHeight - 2)
+                {
+                    tryTiles.Insert(0, PlayerTile + new Vector2(0, -1));
+                }
+                Vector2? petTile = tryTiles.FirstOrDefault(tile => PathFinder.IsPassable(tile, pet));
+                if (petTile != null)
+                {
+                    WarpPet(e.NewLocation, petTile.Value);
+                    Log("Warped pet to " + petTile);
+                }
+                Monitor.Log("warped to unknown location configured as safe: " + Game1.currentLocation.Name, LogLevel.Trace);
             }
             else
             {

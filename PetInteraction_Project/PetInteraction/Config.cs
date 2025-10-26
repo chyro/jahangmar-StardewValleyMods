@@ -14,5 +14,26 @@ namespace PetInteraction
         public bool show_message_on_warp = true;
         public bool unconditional_love = false;
         public bool love_everytime_at_max_friendship = false;
+
+        public string safe_unknown_locations = "Custom_BlueMoonVineyard";
+        public bool getLocationSafe(string locationName)
+        {
+            return this.safe_unknown_locations.Split(',').Contains(locationName);
+        }
+        public void setLocationSafe(string locationName, bool isSafe)
+        {
+            List<string> safeLocationNames = this.safe_unknown_locations.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            if (!isSafe)
+            {
+                // remove if there (does nothing if not)
+                safeLocationNames.Remove(locationName);
+            }
+            else if (!safeLocationNames.Contains(locationName))
+            {
+                // add if not there
+                safeLocationNames.Add(locationName);
+            }
+            this.safe_unknown_locations = string.Join(',', safeLocationNames);
+        }
     }
 }

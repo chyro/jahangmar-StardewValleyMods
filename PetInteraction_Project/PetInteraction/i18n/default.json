@@ -1,4 +1,5 @@
 ﻿{
+    "setting.header": "These locations are safe and your pet can follow you there:",
     "warp.todangerous": "{{petname}} cannot follow you since it's too dangerous here.",
     "warp.waitingoutside": "{{petname}} is waiting outside for you."
 }
